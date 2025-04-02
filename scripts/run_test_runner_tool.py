@@ -1,5 +1,5 @@
 import sys
-sys.path.append('C:/Users/carolinezhu/ort/tools/python')
+sys.path.append('/Users/carolinezhu/Documents/onnxruntime/tools/python')
 
 import ort_test_dir_utils
 
