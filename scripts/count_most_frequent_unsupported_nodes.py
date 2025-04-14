@@ -12,16 +12,16 @@ def process_file(file_path):
 
     # Processing Step 1: Remove lines ending with [1]
     step1_lines = [line for line in lines if not line.rstrip().endswith('[1]')]
-    print("\nAfter removing lines ending with [1]:")
-    print(''.join(step1_lines))
+    # print("\nAfter removing lines ending with [1]:")
+    # print('\n'.join(step1_lines))
 
     # Processing Step 2: Remove lines without "IsOpSupported"
     step2_lines = [line for line in step1_lines if "IsOpSupported" in line]
     print("\nAfter keeping only lines with 'IsOpSupported':")
-    print(''.join(step2_lines))
+    print('\n'.join(step2_lines))
 
     # Define target operations
-    target_ops = ["Concat", "Reshape", "Transpose"]
+    target_ops = ["Concat", "Reshape", "Transpose", "Slice", "Softmax", "Reshape", "Gather", "Shape", "Cast", "Equal", "Expand", "Where", "Unsqueeze"]
     
     # Count occurrences
     op_counts = {op: 0 for op in target_ops}
