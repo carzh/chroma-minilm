@@ -1,64 +1,85 @@
+import Foundation
 import Metal
 import MetalPerformanceShadersGraph
 
-let device = MTLCreateSystemDefaultDevice()!
-let graph = MPSGraph(device: device)
-try graph.load(from: "../output.mpsgraphpackage/model_0.mpsgraph")
+// swiftc test_run.swift -o swift_run_model -framework Foundation -framework Metal -framework MetalPerformanceShadersGraph
 
-/*
-{'input_ids': array([[ 101, 2023, 2003, 2019, 2742, 6251,  102],
-       [ 101, 2169, 6251, 2003, 4991,  102,    0]]), 
-       
-'token_type_ids': array([[0, 0, 0, 0, 0, 0, 0],
-       [0, 0, 0, 0, 0, 0, 0]]), 
-       
-'attention_mask': array([[1, 1, 1, 1, 1, 1, 1],
-       [1, 1, 1, 1, 1, 1, 0]])}
-       */
-let inputArray: [Int64] = [101, 2023, 2003, 2742, 6251, 102, 
-                           101, 2169, 6251, 2003, 4991, 102, 0]
+func runMPSGraphModel(
+    at modelPath: String,
+    batchSize: Int,
+    sequenceLength: Int
+) {
+    guard let device = MTLCreateSystemDefaultDevice() else {
+        print("❌ Metal is not supported on this device.")
+        return
+    }
 
-let inputBuffer = inputArray.asBuffer(on: device)!
+    let modelURL = URL(fileURLWithPath: modelPath)
+    
+    do {
+        let executable = try MPSGraphExecutable(
+            coreMLPackageAtURL: modelURL,
+            descriptor: nil
+        )
 
-let inputTensorData = MPSGraphTensorData(
-    dataType: .int64,
-    shape: [2, 7],
-    buffer: inputBuffer
+        // Prepare dummy input data
+        let inputCount = batchSize * sequenceLength
+
+        let commandQueue = device.makeCommandQueue()!
+
+        let inputIDs: [Int32] = Array(repeating: 1, count: inputCount)
+        let attentionMask: [Int32] = Array(repeating: 1, count: inputCount)
+        let tokenTypeIDs: [Int32] = Array(repeating: 0, count: inputCount)
+
+        func createTensor(from data: [Int32]) -> MPSGraphTensorData {
+            let length = data.count * MemoryLayout<Int32>.stride
+            let buffer = device.makeBuffer(bytes: data, length: length, options: .storageModeShared)!
+            return MPSGraphTensorData(
+                buffer,
+                shape: [NSNumber(value: batchSize), NSNumber(value: sequenceLength)],
+                dataType: .int32
+            )
+        }
+
+        // Reorder inputs to match executable.inputNames order
+        let orderedInputs: [MPSGraphTensorData] = [
+            createTensor(from: inputIDs),        // input_ids
+            createTensor(from: attentionMask),  // attention_mask
+            createTensor(from: tokenTypeIDs)    // token_type_ids
+        ]
+
+        let outputs = try executable.run(
+            with: commandQueue,
+            inputs: orderedInputs,
+            results: nil,
+            executionDescriptor: nil
+        )
+
+        for (i, outputTensorData) in outputs.enumerated() {
+            let ndarray = outputTensorData.mpsndarray
+            let dataBuffer = ndarray.dataBuffer
+            let buffer = dataBuffer.buffer
+            let length = buffer.length
+
+            let rawPointer = buffer.contents()
+            let count = length / MemoryLayout<Float>.stride
+
+            let floatPointer = rawPointer.bindMemory(to: Float.self, capacity: count)
+            let floatArray = Array(UnsafeBufferPointer(start: floatPointer, count: count))
+
+            print("✅ Output Tensor \(i) (\(floatArray.count) values):")
+            for (j, value) in floatArray.prefix(10).enumerated() {
+                print("  [\(j)]: \(value)")
+            }
+        }
+
+    } catch {
+        print("❌ Error loading or running model: \(error)")
+    }
+}
+
+runMPSGraphModel(
+    at: "output.mpsgraphpackage",
+    batchSize: 1,
+    sequenceLength: 12
 )
-
-let tokenTypeArray: [Int64] = [0, 0, 0, 0, 0, 0, 0, 
-                              0, 0, 0, 0, 0, 0, 0]
-
-let tokenTypeBuffer = tokenTypeArray.asBuffer(on: device)!
-
-let tokenTypeTensorData = MPSGraphTensorData(
-    dataType: .int64,
-    shape: [2, 7],
-    buffer: tokenTypeBuffer
-)
-
-let attentionMaskArray: [Int64] = [1, 1, 1, 1, 1, 1, 1, 
-                                  1, 1, 1, 1, 1, 1, 0]
-
-let attentionMaskBuffer = attentionMaskArray.asBuffer(on: device)!
-
-let attentionMaskData = MPSGraphTensorData(
-    dataType: .int64,
-    shape: [2, 7],
-    buffer: attentionMaskBuffer
-)
-
-let commandBuffer = MPSCommandBuffer.makeCommandBuffer()
-let outputs = graph.run(
-    feeds: [
-        "input:0": inputTensorData,
-        "input:1": tokenTypeTensorData,
-        "input:2": attentionMaskData
-    ],
-    targetTensors: ["output_0"]
-) 
-
-commandBuffer.commit()
-
-let outputBuffer = outputs["output_0"]!.buffer
-let outputArray = [Float32](buffer: outputBuffer)
