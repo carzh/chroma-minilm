@@ -20,3 +20,16 @@ command for compiling perf script:
 ```bash
 swiftc -o perf perf.swift -framework Foundation -framework Metal -framework MetalPerformanceShadersGraph
 ```
+
+steps for running onnxruntime_perf_test for yolo:
+1. build onnxruntime
+2. run `python generate_npy_inputs.py`
+3. run `python /Users/carolinezhu/Documents/onnxruntime/tools/python/onnx_test_data_utils.py --action numpy_to_pb --input images.npy --name images --output input_0.pb`
+4. create the following folder structure:
+```
+yolov8/
+└── test_1/
+    ├── model.onnx
+    └── test_input_1/
+        └── input_0.pb
+```
