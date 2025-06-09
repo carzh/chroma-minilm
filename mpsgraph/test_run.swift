@@ -55,24 +55,25 @@ func runMPSGraphModel(
             executionDescriptor: nil
         )
 
-        for (i, outputTensorData) in outputs.enumerated() {
-            let ndarray = outputTensorData.mpsndarray
-            let dataBuffer = ndarray.dataBuffer
-            let buffer = dataBuffer.buffer
-            let length = buffer.length
+        // Read data from MPSNDArray inside the MPSGraphTensorData
 
-            let rawPointer = buffer.contents()
-            let count = length / MemoryLayout<Float>.stride
+        for (i, tensorData) in outputs.enumerated() {
+            print("🔹 Output \(i)")
 
-            let floatPointer = rawPointer.bindMemory(to: Float.self, capacity: count)
-            let floatArray = Array(UnsafeBufferPointer(start: floatPointer, count: count))
+            let ndarray = tensorData.mpsndarray()
+            let elementCount = ndarray.resourceSize()
 
-            print("✅ Output Tensor \(i) (\(floatArray.count) values):")
-            for (j, value) in floatArray.prefix(10).enumerated() {
-                print("  [\(j)]: \(value)")
+            // Prepare destination buffer
+            var outputBuffer = [Float](repeating: 0.0, count: elementCount)
+
+            // Read the data from GPU into outputBuffer
+            outputBuffer.withUnsafeMutableBytes { rawBuffer in
+                ndarray.readBytes(rawBuffer.baseAddress!, strideBytes: nil)
             }
-        }
 
+            print("📈 Output values: \(outputBuffer)")
+            print("🧬 Data type: \(tensorData.dataType)")  // likely .float32
+        }
     } catch {
         print("❌ Error loading or running model: \(error)")
     }
