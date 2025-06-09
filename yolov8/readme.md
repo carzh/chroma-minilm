@@ -33,3 +33,4 @@ yolov8/
     └── test_input_1/
         └── input_0.pb
 ```
+5. run the following: `./onnxruntime_perf_test -e coreml -i "ModelFormat|MLProgram" /Users/carolinezhu/Documents/chroma-minilm/yolov8test/test_1/model.onnx /Users/carolinezhu/Documents/chroma-minilm/yolov8output`
