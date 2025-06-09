@@ -4,8 +4,9 @@ import MetalPerformanceShadersGraph
 guard let url = Bundle.main.url(forResource: "mpsgraph/20250609", withExtension: "mpsgraphpackage") else {
     fatalError("Model not found")
 }
+let descriptor = MPSGraphCompilationDescriptor()
 
-let executable = try MPSGraphExecutable(coreMLPackageAtURL: url, descriptor: nil)
+let executable = try MPSGraphExecutable(package: url, descriptor: descriptor)
 
 let device = MTLCreateSystemDefaultDevice()!
 let graph = MPSGraph()
@@ -20,14 +21,12 @@ let buffer = device.makeBuffer(bytes: inputData,
                                length: inputData.count * MemoryLayout<Float>.size,
                                options: [])!
 
-let descriptor = MPSNDArrayDescriptor(dataType: .float32, shape: inputShape)
-let inputArray = MPSNDArray(device: device, descriptor: descriptor)
+let arrayDescriptor = MPSNDArrayDescriptor(dataType: .float32, shape: inputShape)
+let inputArray = MPSNDArray(device: device, descriptor: arrayDescriptor)
 inputArray.writeBytes(buffer.contents(), strideBytes: nil)
+let inputTensor = MPSGraphTensorData(buffer, shape: inputShape, dataType: .float32)
 
-let inputName = executable.inputTensorNames.first!
-let outputName = executable.outputTensorNames.first! // or all outputs
-
-let inputDict = [inputName: inputArray]
+let inputDict: [MPSGraphTensorData] = [inputTensor]
 
 let commandQueue = device.makeCommandQueue()!
 
